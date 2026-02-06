@@ -1,227 +1,36 @@
-# WASI Preview 2 Resource Leak Investigation
+# WASI Preview 2 fd_close Regression — Rust 1.93.0
 
-## 💣 Status: RELEASE-SPECIFIC BUG - ONLY IN RUST 1.93.0 STABLE
+Minimal reproduction of a release-specific regression where `wasm32-wasip2`
+components compiled by Rust 1.93.0 stable are missing the `fd_close` import,
+causing file descriptor leaks.
 
-**Finding:** Missing `fd_close` import causes file descriptor leaks **ONLY in Rust 1.93.0 stable**.
-**Root Cause:** Bad backport/cherry-pick to 1.93 release branch - bug was **NEVER on master**.
+## Key facts
 
-### 🔬 Bisection Results (Comprehensive Testing)
+- **Bug**: Missing `fd_close` in compiled WASM for wasm32-wasip2
+- **Affected**: Only Rust 1.93.0 stable (254b59607, Jan 19 2026)
+- **Not affected**: All nightlies, 1.92.0 and earlier, 1.94.0-beta
+- **Cause**: Bad cherry-pick/backport to 1.93 release branch (never on master)
+- **Symptom**: File operations fail after ~100-125 iterations with error code 48
 
-**✅ ALL nightly versions work perfectly:**
-- Sept 2025 nightlies (1.92.0-nightly) - ✅ PASS
-- Oct 2025 nightlies (1.92.0-nightly) - ✅ PASS
-- Nov 2025 nightlies (1.93.0-nightly) - ✅ PASS
-- Dec 2025 nightlies (1.94.0-nightly) - ✅ PASS
-- Jan 2026 nightlies (1.94.0-nightly) - ✅ PASS
-
-**❌ ONLY stable 1.93.0 fails:**
-- Rust 1.93.0 stable (Jan 19, 2026) - ❌ FAIL
-
-### Quick Reference
-- 💣 **Bisection:** [notes/06-rust-bisection.md](notes/06-rust-bisection.md) - Bombshell finding
-- 🐛 **Regression:** [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) - Version analysis
-- 📄 **Evidence:** [EVIDENCE.md](EVIDENCE.md) - Smoking gun showing missing `fd_close` import
-- 📊 **Comparison:** `./scripts/compare-imports.sh` - Automated verification script
-- 📚 **Investigation History:** [notes/index.md](notes/index.md)
-
-### Workaround
-
-**Affected:** **ONLY Rust 1.93.0 stable** (release-specific regression)
-**Solutions:**
-- ✅ Use **Rust 1.92.0 or earlier** (stable, works perfectly)
-- ✅ Use **any nightly version** (ALL work, including 1.93.0-nightly)
-- ✅ Use **Rust 1.94.0-beta** (works)
-- ✅ Wait for **Rust 1.94.0 stable** (will work when released)
-- ❌ Avoid **Rust 1.93.0 stable** specifically
-
----
-
-## Project Purpose
-
-This is a minimal reproducible example to investigate a **resource leak in WASI Preview 2** where file descriptors are not properly released when File handles are dropped, despite Rust's RAII guarantees.
-
-This issue was discovered in a larger project and has been isolated to this minimal test case for investigation.
-
-## The Issue
-
-### Observed Behavior
-
-When the WASM component opens and closes files in a loop:
-- ✅ Works fine for ~100 iterations
-- ❌ Fails after ~100-125 iterations with: `Os { code: 48, kind: OutOfMemory, message: "Out of memory" }`
-- 💡 Error code 48 is WASI's "too many open files" error
-
-### Expected Behavior
-
-Each iteration should:
-1. Open the file (`File::open`)
-2. Read some bytes
-3. Drop the `File` handle at end of scope (Rust RAII)
-4. **Release underlying WASI resources** ← This is not happening
-
-### Root Cause Hypothesis
-
-The WASI Preview 2 resource table has a limit of **250 resources**. Each file open appears to consume **~2 resources** (likely one for the file descriptor and one for the input stream). When files are dropped in Rust, the WASM component should be calling the appropriate WASI functions to close/drop these resources, but they appear to remain in the resource table.
-
-## Project Structure
-
-```
-wasi-preview2-test/
-├── component/           # WASM component (wasm32-wasip2)
-│   ├── Cargo.toml
-│   └── src/main.rs     # Opens/reads file 100 times
-├── host/               # Native host (x86_64)
-│   ├── Cargo.toml      # wasmtime 41 with component-model
-│   └── src/main.rs     # Runs the component
-├── test-data/
-│   └── test.txt        # File accessed by component
-├── Cargo.toml          # Workspace root
-└── .cargo/config.toml  # Sets default target to wasm32-wasip2
-```
-
-## Technical Details
-
-### Component (WASM)
-- **Target**: `wasm32-wasip2` (WASI Preview 2)
-- **Rust**: 1.93.0 (January 2026)
-- **Code**: Simple loop that opens file, reads 64 bytes, drops file
-- **Interface**: Exports `wasi:cli/run@0.2.6`
-- **Dependencies**: None (uses std library)
-
-### Host (Native)
-- **Target**: `x86_64-unknown-linux-gnu`
-- **Wasmtime**: Version 41 with component-model feature
-- **WASI**: Preview 2 (p2) in synchronous mode
-- **Preopened dirs**: `./test-data` → `/test-data` (read-only)
-- **Bindings**: Uses wasmtime's component bindgen macro
-
-### Component Code Pattern
-
-```rust
-for i in 1..=100 {
-    {
-        let mut file = File::open(file_path)?;
-        let mut _buffer = [0u8; 64];
-        let _ = file.read(&mut _buffer)?;
-        // file should be dropped here
-    }
-    // Explicit scope to ensure drop
-}
-```
-
-## What We've Tried
-
-1. ✅ **Explicit scoping** - Added explicit `{}` blocks to ensure drop
-2. ✅ **Verified it's not an infinite loop** - Progress messages confirm iterations complete
-3. ✅ **Reduced iterations** - Works fine with 100, fails around 125+
-4. ✅ **Built minimal reproduction** - Isolated from larger project
-5. ❌ **Resource cleanup** - No obvious way to force resource cleanup from component
-
-## Build & Run
+## Build & run
 
 ```bash
-# Build component
-cargo build --release --package wasi-component --target wasm32-wasip2
+# Reproduce the bug
+./scripts/reproduce.sh
 
-# Build host
-cargo build --release --package wasi-host --target x86_64-unknown-linux-gnu
+# Or manually:
+rustup run 1.93.0 cargo build --release -p wasi-component --target wasm32-wasip2
+wasmtime run --dir ./test-data::/test-data target/wasm32-wasip2/release/wasi-component.wasm
 
-# Run (will succeed with 100 iterations)
-cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu
+# Verify fd_close is missing:
+wasm-tools print target/wasm32-wasip2/release/wasi-component.wasm | grep fd_close
 ```
 
-### Testing the Failure
+## Project layout
 
-To see the resource leak failure, edit `component/src/main.rs` and change:
-```rust
-for i in 1..=100 {
-```
-to:
-```rust
-for i in 1..=1000 {
-```
-
-Then rebuild and run. It will fail after ~100-125 iterations.
-
-## Investigation Areas
-
-### 1. Wasmtime/WASI Implementation
-- Is this a known bug in wasmtime 41?
-- Has this been fixed in newer versions?
-- Is there a configuration option to adjust resource limits or cleanup?
-
-### 2. Component Inspection
-- Does the compiled WASM actually call `fd_close` or equivalent?
-- Are drop glue functions properly implemented for wasm32-wasip2?
-- Use `wasm-tools component wit` to inspect exports/imports
-
-### 3. Host Configuration
-- Is the resource table being managed correctly?
-- Should we be manually managing cleanup between component calls?
-- Are there wasmtime engine config options we're missing?
-
-### 4. WASI Preview 2 Specifics
-- Is this Preview 2 specific? Would Preview 1 work?
-- Component model resource management differences?
-- Are we missing required host-side resource cleanup?
-
-### 5. Rust std Library
-- Is wasm32-wasip2 std implementation missing drop calls?
-- Should we use lower-level WASI APIs directly?
-- File buffering interactions?
-
-## Debugging Tools
-
-```bash
-# Inspect component WIT
-wasm-tools component wit target/wasm32-wasip2/release/wasi-component.wasm
-
-# Check what functions are imported/exported
-wasm-tools print target/wasm32-wasip2/release/wasi-component.wasm | grep -A5 "import\|export"
-
-# Disassemble component
-wasm-tools component wit target/wasm32-wasip2/release/wasi-component.wasm > component.wit
-```
-
-## Workarounds Attempted
-
-None successful so far. The only "workaround" is to limit file operations to <100, which isn't viable for real applications.
-
-## Questions to Answer
-
-1. **Where are resources leaking?** Component side (WASM) or host side (wasmtime)?
-2. **What resources exactly?** File descriptors? Streams? Both?
-3. **Is this reproducible across platforms?** Linux-specific or general?
-4. **Version-specific?** Does wasmtime 42+ fix this? What about older versions?
-5. **Is manual cleanup possible?** Can we explicitly close resources from the component?
-
-## Desired Outcome
-
-Figure out:
-- Root cause of the resource leak
-- Whether it's a bug in wasmtime, Rust std, or our code
-- How to properly clean up WASI Preview 2 resources
-- A fix or workaround that allows unlimited file operations
-
-## References
-
-- [WASI Preview 2 Spec](https://github.com/WebAssembly/WASI/tree/main/preview2)
-- [Component Model](https://github.com/WebAssembly/component-model)
-- [Wasmtime Documentation](https://docs.wasmtime.dev/)
-- [wasm32-wasip2 Target](https://doc.rust-lang.org/nightly/rustc/platform-support/wasm32-wasip2.html)
-
-## Investigation Notes
-
-**📁 Check the `notes/` directory for detailed investigation findings.**
-
-Each investigation session is documented in the `notes/` directory with:
-- Detailed findings and data
-- Commands run and results
-- Conclusions and next steps
-
-Start with **[notes/index.md](notes/index.md)** for a summary and index of all notes.
-
-## Git History
-
-- Initial commit: Minimal reproduction of resource leak issue
-- Each investigation attempt should be committed with clear description
+- `component/` — wasm32-wasip2 component (the reproduction)
+- `component-p1/` — wasm32-wasip1 module (comparison, works correctly)
+- `host/` — Custom wasmtime host supporting P1 and P2
+- `scripts/` — Reproduction and testing scripts
+- `notes/` — Investigation history
+- `.cargo/config.toml` — Sets default target to wasm32-wasip2

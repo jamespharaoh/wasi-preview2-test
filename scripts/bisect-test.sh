@@ -1,37 +1,36 @@
-#!/bin/bash
-# Bisect test script for cargo-bisect-rustc
-# This tests whether a Rust version has the fd_close resource leak bug
+#!/usr/bin/env bash
+# Bisect test script for cargo-bisect-rustc.
 #
 # Exit codes:
-#   0 = Good (no leak - test passed)
-#   1 = Bad (has leak - test failed)
-# 125 = Skip (couldn't build)
+#   0   = Good (no leak)
+#   1   = Bad (leak detected)
+#   125 = Skip (build failed)
 
 set -e
 
-echo "=== Testing Rust version: $(rustc --version) ==="
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
 
-# Build the component with the Rust version being tested
+echo "=== Testing: $(rustc --version) ==="
+
+# Build the component with the version under test
 echo "Building component..."
-cd /home/james/projects/mine/wasi-preview2-test/component
-cargo build --release --target wasm32-wasip2 2>&1 || exit 125
+(cd component && cargo build --release --target wasm32-wasip2 2>&1) || exit 125
 
-# Build the host with stable Rust (we're not testing the host)
+# Extract WIT
+wasm-tools component wit target/wasm32-wasip2/release/wasi-component.wasm \
+    > target/wasm32-wasip2/release/wasi-component.wit 2>/dev/null || exit 125
+
+# Build the host with stable Rust
 echo "Building host..."
-cd /home/james/projects/mine/wasi-preview2-test/host
-# Use stable for host
-rustup run stable cargo build --release --target x86_64-unknown-linux-gnu 2>&1 || exit 125
+(cd host && rustup run stable cargo build --release --target x86_64-unknown-linux-gnu 2>&1) || exit 125
 
 # Run the test
 echo "Running test..."
-cd /home/james/projects/mine/wasi-preview2-test
-rustup run stable cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu 2>&1
-
-# Check exit code
-if [ $? -eq 0 ]; then
-    echo "✅ GOOD: Test passed (no resource leak)"
+if cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu 2>&1; then
+    echo "GOOD: no resource leak"
     exit 0
 else
-    echo "❌ BAD: Test failed (resource leak detected)"
+    echo "BAD: resource leak detected"
     exit 1
 fi

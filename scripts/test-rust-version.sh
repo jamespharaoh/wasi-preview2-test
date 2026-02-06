@@ -1,18 +1,28 @@
-#!/bin/bash
-# Test a specific Rust version (stable or nightly) for the fd_close leak
-# Usage: ./test-rust-version.sh <version>
-#   Examples:
-#     ./test-rust-version.sh 1.92.0
-#     ./test-rust-version.sh nightly-2025-10-01
+#!/usr/bin/env bash
+# Test a specific Rust version for the fd_close leak.
+#
+# Usage:
+#   ./scripts/test-rust-version.sh <version>
+#
+# Examples:
+#   ./scripts/test-rust-version.sh 1.92.0
+#   ./scripts/test-rust-version.sh 1.93.0
+#   ./scripts/test-rust-version.sh nightly-2025-11-18
 
-VERSION=$1
+set -euo pipefail
+
+VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
     echo "Usage: $0 <rust-version>"
     echo "Examples:"
     echo "  $0 1.92.0"
-    echo "  $0 nightly-2025-10-01"
+    echo "  $0 1.93.0"
+    echo "  $0 nightly-2025-11-18"
     exit 1
 fi
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
 
 echo "========================================="
 echo "Testing Rust version: $VERSION"
@@ -22,53 +32,45 @@ echo "========================================="
 echo "Installing Rust $VERSION..."
 rustup toolchain install "$VERSION" --profile minimal --target wasm32-wasip2
 
-# Clean only the component build
-echo "Cleaning component build..."
-cd /home/james/projects/mine/wasi-preview2-test/component
-cargo clean
-
-# Build component with the test version
+# Clean and rebuild the component
 echo "Building component with Rust $VERSION..."
-rustup run "$VERSION" cargo build --release --target wasm32-wasip2
-COMPONENT_BUILD=$?
+(cd component && cargo clean)
+rustup run "$VERSION" cargo build --release --package wasi-component --target wasm32-wasip2
 
-if [ $COMPONENT_BUILD -ne 0 ]; then
-    echo "❌ Failed to build component with Rust $VERSION"
-    exit 1
-fi
+# Extract WIT (needed by host build)
+echo "Extracting WIT..."
+wasm-tools component wit target/wasm32-wasip2/release/wasi-component.wasm \
+    > target/wasm32-wasip2/release/wasi-component.wit
 
-# Extract WIT from the component
-echo "Extracting WIT from component..."
-cd /home/james/projects/mine/wasi-preview2-test
-wasm-tools component wit target/wasm32-wasip2/release/wasi-component.wasm > target/wasm32-wasip2/release/wasi-component.wit
+# Build the host with stable Rust
+echo "Building host..."
+cargo build --release --package wasi-host --target x86_64-unknown-linux-gnu
 
-# Build host with stable
-echo "Building host with stable Rust..."
-cd /home/james/projects/mine/wasi-preview2-test/host
-cargo build --release --target x86_64-unknown-linux-gnu
-HOST_BUILD=$?
-
-if [ $HOST_BUILD -ne 0 ]; then
-    echo "❌ Failed to build host"
-    exit 1
-fi
-
-# Run the test (make sure we're in the project root)
+# Check for fd_close in the compiled component
 echo ""
-echo "Running test (200 iterations)..."
-echo "---"
-cd /home/james/projects/mine/wasi-preview2-test
-cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu
-TEST_RESULT=$?
+echo "--- Import analysis ---"
+WASM_TXT="$(mktemp)"
+wasm-tools print target/wasm32-wasip2/release/wasi-component.wasm > "$WASM_TXT" 2>/dev/null || true
+if grep -q "fd_close" "$WASM_TXT"; then
+    echo "fd_close: PRESENT"
+else
+    echo "fd_close: MISSING"
+fi
+rm -f "$WASM_TXT"
+
+# Run the test
+echo ""
+echo "--- Running test (1000 iterations) ---"
+TEST_RESULT=0
+cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu || TEST_RESULT=$?
 
 echo ""
 echo "========================================="
-if [ $TEST_RESULT -eq 0 ]; then
-    echo "✅ PASS: Rust $VERSION - No resource leak"
-    echo "========================================="
+if [ "$TEST_RESULT" -eq 0 ]; then
+    echo "PASS: Rust $VERSION - no resource leak"
 else
-    echo "❌ FAIL: Rust $VERSION - Resource leak detected"
-    echo "========================================="
+    echo "FAIL: Rust $VERSION - resource leak detected"
 fi
+echo "========================================="
 
-exit $TEST_RESULT
+exit "$TEST_RESULT"
