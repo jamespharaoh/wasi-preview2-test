@@ -10,6 +10,8 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 
 3. **[preview1-comparison.md](preview1-comparison.md)** - ✅ **ADAPTER HYPOTHESIS CONFIRMED**: Created identical test using `wasm32-wasip1` target (Preview 1 without adapter). Preview 1 successfully completes 1000+ iterations while Preview 2 fails after ~100. This proves the bug is specifically in the P1→P2 adapter layer, not in wasmtime's core P1 implementation.
 
+4. **[03-third-party-reproduction.md](03-third-party-reproduction.md)** - ✅ **THIRD-PARTY CONFIRMATION**: Reproduced the resource leak in [wasip2_plugins](https://github.com/benwis/wasip2_plugins) (completely independent codebase). Bug confirmed across multiple wasmtime versions (29, 41) and multiple codebases. **NEW FINDING**: Resources persist across component invocations - 100 iterations succeeded, then 2nd call failed at iteration 25 (125 total = resource table limit).
+
 ## Summary of Findings
 
 ### Root Cause (High Confidence)
@@ -29,8 +31,11 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 - Adapter receives `fd_close` but doesn't clean up underlying WASIp2 resources
 - Resources accumulate until hitting the ~250 resource table limit
 - Error code 48 (ENOMEM) occurs when resource table is exhausted
-- **🎯 NEW: Preview 1 direct (no adapter) works perfectly with 1000+ iterations**
+- **🎯 Preview 1 direct (no adapter) works perfectly with 1000+ iterations**
 - **This definitively proves the bug is in the adapter layer, not wasmtime's P1 core**
+- **🎯 Bug reproduced in third-party code (wasip2_plugins) with wasmtime 29**
+- **Confirms issue exists across wasmtime versions 29 → 41**
+- **🔥 Resources persist across component invocations** - not cleaned up between async calls
 
 ### Why This Hasn't Been Found Before
 
@@ -45,7 +50,8 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 - [x] GitHub issue search - **No existing issue found**
 - [x] Root cause analysis - **Adapter layer identified**
 - [x] Verification with wasm32-wasip1 target - ✅ **CONFIRMED: Preview 1 works perfectly (1000+ iterations)**
+- [x] Third-party reproduction - ✅ **CONFIRMED: Bug reproduced in wasip2_plugins (wasmtime 29)**
 - [ ] File bug report with wasmtime
 - [ ] File bug report with rust-lang
-- [ ] Try newer wasmtime versions
 - [ ] Inspect adapter source code
+- [ ] Test potential workarounds
