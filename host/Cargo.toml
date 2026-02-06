@@ -1,0 +1,14 @@
+[package]
+name = "wasi-host"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "wasi-host"
+path = "src/main.rs"
+
+[dependencies]
+wasmtime = { version = "41", features = ["component-model"] }
+wasmtime-wasi = "41"
+anyhow = "1.0"
+cap-std = "3"

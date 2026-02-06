@@ -1,0 +1,8 @@
+[package]
+name = "wasi-component"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "wasi-component"
+path = "src/main.rs"

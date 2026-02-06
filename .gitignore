@@ -1,0 +1,22 @@
+# Rust build artifacts
+/target/
+
+# Cargo.lock for libraries (keep it for binaries/applications)
+# Cargo.lock
+
+# Debug symbols
+**/*.pdb
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/
