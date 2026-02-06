@@ -1,5 +1,7 @@
 # Missing `fd_close` in wasm32-wasip2: Rust 1.93.0 regression
 
+**Upstream issue:** [rust-lang/rust#152255](https://github.com/rust-lang/rust/issues/152255)
+
 Rust 1.93.0 stable produces `wasm32-wasip2` components that are missing the
 `fd_close` import from `wasi_snapshot_preview1`. File descriptors are never
 released, exhausting the WASI resource table after ~100-125 file operations.
