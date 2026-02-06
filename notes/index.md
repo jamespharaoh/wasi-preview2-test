@@ -13,6 +13,8 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 4. **[03-third-party-reproduction.md](03-third-party-reproduction.md)** - ✅ **THIRD-PARTY CONFIRMATION**: Reproduced the resource leak in [wasip2_plugins](https://github.com/benwis/wasip2_plugins) (completely independent codebase). Bug confirmed across multiple wasmtime versions (29, 41) and multiple codebases. **NEW FINDING**: Resources persist across component invocations - 100 iterations succeeded, then 2nd call failed at iteration 25 (125 total = resource table limit).
 
 5. **[04-wasm-import-analysis.md](04-wasm-import-analysis.md)** - 🔍 **WASM BYTECODE EVIDENCE**: Direct inspection of compiled WASM shows that `wasm32-wasip2` does **not import `fd_close`**, while `wasm32-wasip1` does. This provides low-level evidence of how the adapter issue manifests - the component uses P1 APIs (`path_open`, `fd_read`) but doesn't import the corresponding cleanup function (`fd_close`). Created automated comparison script at `scripts/compare-imports.sh`.
+   - See also: [wasm-inspection/ADAPTER-EXPLAINED.md](wasm-inspection/ADAPTER-EXPLAINED.md) - Simple explanation of adapter architecture
+   - See also: [wasm-inspection/adapter-architecture.md](wasm-inspection/adapter-architecture.md) - Detailed adapter architecture
 
 ## Summary of Findings
 
