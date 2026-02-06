@@ -2,6 +2,14 @@
 
 This project demonstrates a **resource leak in WASI Preview 2** that does not occur in Preview 1, through identical file I/O operations using Rust.
 
+## 🔍 Root Cause Identified
+
+**TL;DR:** The wasm32-wasip2 compiler target does not emit `fd_close` imports, causing file descriptor leaks.
+
+- 📄 **Quick Evidence:** [EVIDENCE.md](EVIDENCE.md) - Shows the missing `fd_close` import
+- 📁 **Full Investigation:** [notes/index.md](notes/index.md) - Complete analysis chain
+- 🔬 **Automated Verification:** Run `./scripts/compare-imports.sh` to see the difference
+
 ⚠️ **See [COMPARISON.md](COMPARISON.md) for detailed test results and analysis.**
 
 ## Project Structure

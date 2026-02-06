@@ -12,6 +12,8 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 
 4. **[03-third-party-reproduction.md](03-third-party-reproduction.md)** - ✅ **THIRD-PARTY CONFIRMATION**: Reproduced the resource leak in [wasip2_plugins](https://github.com/benwis/wasip2_plugins) (completely independent codebase). Bug confirmed across multiple wasmtime versions (29, 41) and multiple codebases. **NEW FINDING**: Resources persist across component invocations - 100 iterations succeeded, then 2nd call failed at iteration 25 (125 total = resource table limit).
 
+5. **[04-wasm-import-analysis.md](04-wasm-import-analysis.md)** - 🔍 **WASM BYTECODE EVIDENCE**: Direct inspection of compiled WASM shows that `wasm32-wasip2` does **not import `fd_close`**, while `wasm32-wasip1` does. This provides low-level evidence of how the adapter issue manifests - the component uses P1 APIs (`path_open`, `fd_read`) but doesn't import the corresponding cleanup function (`fd_close`). Created automated comparison script at `scripts/compare-imports.sh`.
+
 ## Summary of Findings
 
 ### Root Cause (High Confidence)
@@ -36,6 +38,9 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 - **🎯 Bug reproduced in third-party code (wasip2_plugins) with wasmtime 29**
 - **Confirms issue exists across wasmtime versions 29 → 41**
 - **🔥 Resources persist across component invocations** - not cleaned up between async calls
+- **🔍 WASM bytecode analysis**: P2 component imports `path_open` and `fd_read` (P1 APIs) but does NOT import `fd_close`
+- **P1 component DOES import all three**: `path_open`, `fd_read`, `fd_close`
+- **This explains the mechanism**: Rust std is trying to use P2 resource-drop but still uses P1 file APIs, creating an incomplete hybrid
 
 ### Why This Hasn't Been Found Before
 
@@ -51,7 +56,10 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 - [x] Root cause analysis - **Adapter layer identified**
 - [x] Verification with wasm32-wasip1 target - ✅ **CONFIRMED: Preview 1 works perfectly (1000+ iterations)**
 - [x] Third-party reproduction - ✅ **CONFIRMED: Bug reproduced in wasip2_plugins (wasmtime 29)**
+- [x] WASM bytecode analysis - ✅ **CONFIRMED: fd_close not imported in P2, IS imported in P1**
 - [ ] File bug report with wasmtime
 - [ ] File bug report with rust-lang
 - [ ] Inspect adapter source code
+- [ ] Inspect Rust std library source (wasm32-wasip2 File implementation)
 - [ ] Test potential workarounds
+- [ ] Test different Rust versions (identify when bug was introduced)

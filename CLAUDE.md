@@ -1,5 +1,17 @@
 # WASI Preview 2 Resource Leak Investigation
 
+## 🎯 Status: ROOT CAUSE IDENTIFIED
+
+**Finding:** The wasm32-wasip2 target does not import `fd_close`, causing file descriptor leaks.
+
+### Quick Reference
+- 📄 **Evidence:** [EVIDENCE.md](EVIDENCE.md) - Smoking gun showing missing `fd_close` import
+- 📊 **Comparison:** `./scripts/compare-imports.sh` - Automated verification script
+- 📁 **Full Details:** [notes/04-wasm-import-analysis.md](notes/04-wasm-import-analysis.md)
+- 📚 **Investigation History:** [notes/index.md](notes/index.md)
+
+---
+
 ## Project Purpose
 
 This is a minimal reproducible example to investigate a **resource leak in WASI Preview 2** where file descriptors are not properly released when File handles are dropped, despite Rust's RAII guarantees.
