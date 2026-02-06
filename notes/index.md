@@ -15,6 +15,7 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 5. **[04-wasm-import-analysis.md](04-wasm-import-analysis.md)** - 🔍 **WASM BYTECODE EVIDENCE**: Direct inspection of compiled WASM shows that `wasm32-wasip2` does **not import `fd_close`**, while `wasm32-wasip1` does. This provides low-level evidence of how the adapter issue manifests - the component uses P1 APIs (`path_open`, `fd_read`) but doesn't import the corresponding cleanup function (`fd_close`). Created automated comparison script at `scripts/compare-imports.sh`.
    - See also: [wasm-inspection/ADAPTER-EXPLAINED.md](wasm-inspection/ADAPTER-EXPLAINED.md) - Simple explanation of adapter architecture
    - See also: [wasm-inspection/adapter-architecture.md](wasm-inspection/adapter-architecture.md) - Detailed adapter architecture
+   - See also: [wasm-inspection/main-module-imports.md](wasm-inspection/main-module-imports.md) - **🎯 KEY FINDING**: Our main module uses BOTH P1 and P2 APIs (hybrid approach). The bug is in Rust std, not the adapter!
 
 ## Summary of Findings
 
