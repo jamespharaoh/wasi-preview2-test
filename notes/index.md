@@ -17,16 +17,25 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
    - See also: [wasm-inspection/adapter-architecture.md](wasm-inspection/adapter-architecture.md) - Detailed adapter architecture
    - See also: [wasm-inspection/main-module-imports.md](wasm-inspection/main-module-imports.md) - **🎯 KEY FINDING**: Our main module uses BOTH P1 and P2 APIs (hybrid approach). The bug is in Rust std, not the adapter!
 
+6. **[05-rust-version-regression.md](05-rust-version-regression.md)** - 🐛 **REGRESSION IDENTIFIED**: Bug was **introduced in Rust 1.93.0** (2026-01-19) and **fixed in nightly 1.95.0** (2026-02-05). Version bisection shows:
+   - Rust 1.90.0-1.92.0: ✅ **Works** (has `fd_close` import)
+   - Rust 1.93.0: ❌ **Broken** (missing `fd_close` - regression)
+   - Rust 1.94.0-beta: ❌ **Broken** (still missing)
+   - Rust 1.95.0-nightly: ✅ **Fixed** (migrated to pure P2, eliminates hybrid approach)
+
+   **Workaround:** Use Rust 1.92.0 or nightly 1.95.0+ until stable fix releases.
+
 ## Summary of Findings
 
-### Root Cause (High Confidence)
+### Root Cause (Confirmed)
 
-**The wasi-preview1-component-adapter is leaking WASIp2 resources.**
+**Regression in Rust 1.93.0 where `fd_close` import was removed from wasm32-wasip2 target.**
 
-- ✅ Rust std for `wasm32-wasip2` still uses WASIp1 filesystem APIs (confirmed in [PR #145944](https://github.com/rust-lang/rust/pull/145944))
-- ✅ WASIp1 calls go through an adapter layer that converts to WASIp2
-- ✅ WASIp2 requires explicit `resource.drop` calls for cleanup
-- 🔍 Adapter likely doesn't call `resource.drop` when handling `fd_close`
+- ✅ **Bug introduced:** Rust 1.93.0 (2026-01-19)
+- ✅ **Bug fixed:** Rust 1.95.0-nightly (2026-02-05) via pure P2 migration
+- ✅ Rust std for `wasm32-wasip2` uses hybrid P1/P2 approach (in 1.93.0)
+- ✅ Missing `fd_close` import causes file descriptor leaks
+- ✅ Nightly 1.95.0 eliminates hybrid approach entirely (pure P2)
 - ✅ No existing GitHub issue found - this appears to be a **new bug**
 
 ### Evidence
@@ -56,13 +65,11 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 
 - [x] Version verification - Using latest stable versions
 - [x] GitHub issue search - **No existing issue found**
-- [x] Root cause analysis - **Adapter layer identified**
+- [x] Root cause analysis - **Missing fd_close in Rust 1.93.0**
 - [x] Verification with wasm32-wasip1 target - ✅ **CONFIRMED: Preview 1 works perfectly (1000+ iterations)**
 - [x] Third-party reproduction - ✅ **CONFIRMED: Bug reproduced in wasip2_plugins (wasmtime 29)**
 - [x] WASM bytecode analysis - ✅ **CONFIRMED: fd_close not imported in P2, IS imported in P1**
-- [ ] File bug report with wasmtime
-- [ ] File bug report with rust-lang
-- [ ] Inspect adapter source code
-- [ ] Inspect Rust std library source (wasm32-wasip2 File implementation)
-- [ ] Test potential workarounds
-- [ ] Test different Rust versions (identify when bug was introduced)
+- [x] Test different Rust versions - ✅ **CONFIRMED: Regression in 1.93.0, fixed in nightly 1.95.0**
+- [ ] File bug report with rust-lang (prepared evidence)
+- [ ] Track fix landing in stable (expected 1.95.0 ~March 2026)
+- [ ] Inspect Rust std library source (identify exact PR that caused regression)

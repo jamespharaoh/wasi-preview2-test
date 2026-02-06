@@ -1,14 +1,24 @@
 # WASI Preview 2 Resource Leak Investigation
 
-## 🎯 Status: ROOT CAUSE IDENTIFIED
+## 🎯 Status: ROOT CAUSE IDENTIFIED & FIXED IN NIGHTLY
 
-**Finding:** The wasm32-wasip2 target does not import `fd_close`, causing file descriptor leaks.
+**Finding:** Regression in Rust 1.93.0 - missing `fd_close` import causes file descriptor leaks.
+**Fix:** Rust 1.95.0-nightly migrates to pure WASI Preview 2, eliminating the leak.
 
 ### Quick Reference
+- 🐛 **Regression:** [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) - Version bisection results
 - 📄 **Evidence:** [EVIDENCE.md](EVIDENCE.md) - Smoking gun showing missing `fd_close` import
 - 📊 **Comparison:** `./scripts/compare-imports.sh` - Automated verification script
 - 📁 **Full Details:** [notes/04-wasm-import-analysis.md](notes/04-wasm-import-analysis.md)
 - 📚 **Investigation History:** [notes/index.md](notes/index.md)
+
+### Workaround
+
+**Affected:** Rust 1.93.0, 1.94.0 (likely)
+**Solutions:**
+- Use **Rust 1.92.0 or earlier** (stable, works)
+- Use **Rust nightly** (1.95.0+, fixed via pure P2)
+- Wait for **Rust 1.95.0 stable** (~March 2026)
 
 ---
 

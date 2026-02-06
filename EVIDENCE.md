@@ -93,13 +93,29 @@ This is a **compiler/standard library bug** in the wasm32-wasip2 target, not a w
 
 ---
 
+## Update: Version Regression Identified (2026-02-06)
+
+**Regression:** Bug introduced in **Rust 1.93.0** (2026-01-19)
+**Fix:** Merged in **Rust 1.95.0-nightly** (2026-02-05) via pure P2 migration
+
+See [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) for full version bisection results.
+
+| Rust Version | Status | Notes |
+|-------------|--------|-------|
+| 1.90.0-1.92.0 | ✅ Works | Has `fd_close` import |
+| 1.93.0 | ❌ **Broken** | Missing `fd_close` - **regression** |
+| 1.94.0-beta | ❌ **Broken** | Still missing `fd_close` |
+| 1.95.0-nightly | ✅ **Fixed** | Pure P2 implementation, no P1 hybrid |
+
+**Workaround:** Use Rust 1.92.0 or nightly 1.95.0+
+
 ## Next Steps
 
 1. ✅ Evidence documented (this file + detailed notes)
-2. 🔄 Test different Rust versions (1.83, 1.85, 1.93) to see if/when bug was introduced
-3. 🔄 Check Rust std library source for wasm32-wasip2 File implementation
-4. 🔄 Report bug to Rust/WASI with this evidence
-5. 🔄 Look for workarounds (manual fd management, pure P2 APIs)
+2. ✅ Test different Rust versions - **Regression found in 1.93.0**
+3. ✅ Confirmed fix in nightly 1.95.0 (pure P2 migration)
+4. 🔄 Report bug to Rust team with evidence
+5. 🔄 Track fix landing in stable (1.95.0 expected ~March 2026)
 
 ---
 
