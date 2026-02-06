@@ -1726,6 +1726,10 @@ name = "wasi-component"
 version = "0.1.0"
 
 [[package]]
+name = "wasi-component-p1"
+version = "0.1.0"
+
+[[package]]
 name = "wasi-host"
 version = "0.1.0"
 dependencies = [

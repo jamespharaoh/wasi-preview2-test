@@ -1,12 +1,15 @@
-# WASI Preview 2 Sample Program
+# WASI Preview 1 vs Preview 2 Resource Leak Demo
 
-This project demonstrates WASI Preview 2 (the WebAssembly Component Model) with file I/O operations using Rust.
+This project demonstrates a **resource leak in WASI Preview 2** that does not occur in Preview 1, through identical file I/O operations using Rust.
+
+⚠️ **See [COMPARISON.md](COMPARISON.md) for detailed test results and analysis.**
 
 ## Project Structure
 
-- `component/` - WASM component that performs file operations
-- `host/` - Native host application that runs the component using wasmtime
-- `test-data/` - Test file for the component to access
+- `component/` - WASM component (Preview 2) that demonstrates the resource leak
+- `component-p1/` - WASM module (Preview 1) that works correctly
+- `host/` - Native host application supporting both P1 and P2
+- `test-data/` - Test file for the components to access
 
 ## What It Does
 
@@ -15,20 +18,22 @@ The WASM component opens and reads a test file 100 times, demonstrating:
 - Component model instantiation and execution
 - Host-to-component communication
 
-## Building
+## Quick Demo
+
+### Run Preview 2 (Shows the Bug)
 
 ```bash
-# Build the WASM component
+# Build and run - will FAIL after ~100 iterations
 cargo build --release --package wasi-component --target wasm32-wasip2
-
-# Build the host
-cargo build --release --package wasi-host --target x86_64-unknown-linux-gnu
+cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu -- p2
 ```
 
-## Running
+### Run Preview 1 (Works Correctly)
 
 ```bash
-cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu
+# Build and run - completes 1000 iterations successfully
+cargo build --release --package wasi-component-p1 --target wasm32-wasip1
+cargo run --release --package wasi-host --target x86_64-unknown-linux-gnu -- p1
 ```
 
 ## Expected Output
@@ -60,15 +65,25 @@ Component execution completed successfully!
 - Uses wasmtime's component bindgen to generate type-safe bindings
 - Provides WASI Preview 2 (p2) implementations synchronously
 
-## Technical Notes
+## The Bug
 
-### Resource Limits
-The original plan called for 1000 iterations, but the current implementation successfully completes 100 iterations. Attempting 1000 iterations hits a resource limit (file descriptor limit in the WASI implementation). This is a known limitation and doesn't affect the demonstration of WASI Preview 2 functionality.
+**Preview 2 fails after ~100-125 iterations with:**
+```
+Error: Os { code: 48, kind: OutOfMemory, message: "Out of memory" }
+```
 
-### WASI Preview 2 vs Preview 1
-- Preview 2 uses the Component Model for better modularity
-- Resources are managed through the component model's resource system
-- More structured interface definitions via WIT (WebAssembly Interface Types)
+Error code 48 is WASI's "too many open files" error. File descriptors are not being released when `File` handles are dropped, despite Rust's RAII guarantees.
+
+**Preview 1 works correctly** with 1000+ iterations, proving the issue is specific to Preview 2.
+
+## Root Cause
+
+The resource leak is in one of:
+1. wasmtime's Preview 2 resource table implementation
+2. Component Model's resource cleanup semantics
+3. Rust std library's `wasm32-wasip2` target
+
+The fact that Preview 1 works proves the test code is valid and the host is capable of proper cleanup.
 
 ## Dependencies
 

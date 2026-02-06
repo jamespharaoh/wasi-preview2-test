@@ -1,0 +1,7 @@
+[package]
+name = "wasi-component-p1"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# No dependencies needed - using std library only

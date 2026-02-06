@@ -1,5 +1,5 @@
 [workspace]
-members = ["component", "host"]
+members = ["component", "component-p1", "host"]
 resolver = "2"
 
 [workspace.package]
