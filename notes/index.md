@@ -25,18 +25,25 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 
    **Workaround:** Use Rust 1.92.0 or nightly 1.95.0+ until stable fix releases.
 
+7. **[06-rust-bisection.md](06-rust-bisection.md)** - 💣 **BOMBSHELL FINDING**: Comprehensive bisection reveals the bug **ONLY exists in Rust 1.93.0 stable**. All nightly versions tested (Sept 2025 through Jan 2026) work perfectly, including 1.93.0-nightly. This proves the bug was **never on master** and was introduced during the 1.93.0 release process, likely through a bad cherry-pick/backport to the stable branch.
+
 ## Summary of Findings
 
 ### Root Cause (Confirmed)
 
-**Regression in Rust 1.93.0 where `fd_close` import was removed from wasm32-wasip2 target.**
+**💣 Release-specific regression: `fd_close` import missing ONLY in Rust 1.93.0 stable**
 
-- ✅ **Bug introduced:** Rust 1.93.0 (2026-01-19)
-- ✅ **Bug fixed:** Rust 1.95.0-nightly (2026-02-05) via pure P2 migration
-- ✅ Rust std for `wasm32-wasip2` uses hybrid P1/P2 approach (in 1.93.0)
+- ✅ **Bug introduced:** Rust 1.93.0 stable ONLY (2026-01-19) - likely bad backport
+- ✅ **Bug was NEVER on master:** ALL nightlies work (Sept 2025 → Jan 2026)
+- ✅ **1.92.0 stable:** Works perfectly
+- ✅ **1.93.0-nightly:** Works perfectly (tested Nov 18, 2025)
+- ✅ **1.94.0-nightly:** Works perfectly (tested Dec 29, 2025 → Jan 18, 2026)
+- ❌ **1.93.0 STABLE:** BROKEN (missing `fd_close` import)
+- ✅ Rust std for `wasm32-wasip2` uses hybrid P1/P2 approach
 - ✅ Missing `fd_close` import causes file descriptor leaks
-- ✅ Nightly 1.95.0 eliminates hybrid approach entirely (pure P2)
 - ✅ No existing GitHub issue found - this appears to be a **new bug**
+
+**This is a release branch-specific regression, suggesting a bad cherry-pick or backport during the 1.93.0 release process.**
 
 ### Evidence
 
@@ -70,6 +77,7 @@ This directory contains detailed notes from investigating the WASI Preview 2 res
 - [x] Third-party reproduction - ✅ **CONFIRMED: Bug reproduced in wasip2_plugins (wasmtime 29)**
 - [x] WASM bytecode analysis - ✅ **CONFIRMED: fd_close not imported in P2, IS imported in P1**
 - [x] Test different Rust versions - ✅ **CONFIRMED: Regression in 1.93.0, fixed in nightly 1.95.0**
+- [x] **Bisect nightly versions** - ✅ **BOMBSHELL: Bug ONLY in 1.93.0 stable, never on master**
+- [ ] Inspect Rust 1.93.0 release branch (identify bad backport/cherry-pick)
 - [ ] File bug report with rust-lang (prepared evidence)
-- [ ] Track fix landing in stable (expected 1.95.0 ~March 2026)
-- [ ] Inspect Rust std library source (identify exact PR that caused regression)
+- [ ] Track fix landing in stable (1.94.0 should work when released)

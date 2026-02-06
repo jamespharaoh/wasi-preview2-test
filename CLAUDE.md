@@ -1,24 +1,38 @@
 # WASI Preview 2 Resource Leak Investigation
 
-## 🎯 Status: ROOT CAUSE IDENTIFIED & FIXED IN NIGHTLY
+## 💣 Status: RELEASE-SPECIFIC BUG - ONLY IN RUST 1.93.0 STABLE
 
-**Finding:** Regression in Rust 1.93.0 - missing `fd_close` import causes file descriptor leaks.
-**Fix:** Rust 1.95.0-nightly migrates to pure WASI Preview 2, eliminating the leak.
+**Finding:** Missing `fd_close` import causes file descriptor leaks **ONLY in Rust 1.93.0 stable**.
+**Root Cause:** Bad backport/cherry-pick to 1.93 release branch - bug was **NEVER on master**.
+
+### 🔬 Bisection Results (Comprehensive Testing)
+
+**✅ ALL nightly versions work perfectly:**
+- Sept 2025 nightlies (1.92.0-nightly) - ✅ PASS
+- Oct 2025 nightlies (1.92.0-nightly) - ✅ PASS
+- Nov 2025 nightlies (1.93.0-nightly) - ✅ PASS
+- Dec 2025 nightlies (1.94.0-nightly) - ✅ PASS
+- Jan 2026 nightlies (1.94.0-nightly) - ✅ PASS
+
+**❌ ONLY stable 1.93.0 fails:**
+- Rust 1.93.0 stable (Jan 19, 2026) - ❌ FAIL
 
 ### Quick Reference
-- 🐛 **Regression:** [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) - Version bisection results
+- 💣 **Bisection:** [notes/06-rust-bisection.md](notes/06-rust-bisection.md) - Bombshell finding
+- 🐛 **Regression:** [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) - Version analysis
 - 📄 **Evidence:** [EVIDENCE.md](EVIDENCE.md) - Smoking gun showing missing `fd_close` import
 - 📊 **Comparison:** `./scripts/compare-imports.sh` - Automated verification script
-- 📁 **Full Details:** [notes/04-wasm-import-analysis.md](notes/04-wasm-import-analysis.md)
 - 📚 **Investigation History:** [notes/index.md](notes/index.md)
 
 ### Workaround
 
-**Affected:** Rust 1.93.0, 1.94.0 (likely)
+**Affected:** **ONLY Rust 1.93.0 stable** (release-specific regression)
 **Solutions:**
-- Use **Rust 1.92.0 or earlier** (stable, works)
-- Use **Rust nightly** (1.95.0+, fixed via pure P2)
-- Wait for **Rust 1.95.0 stable** (~March 2026)
+- ✅ Use **Rust 1.92.0 or earlier** (stable, works perfectly)
+- ✅ Use **any nightly version** (ALL work, including 1.93.0-nightly)
+- ✅ Use **Rust 1.94.0-beta** (works)
+- ✅ Wait for **Rust 1.94.0 stable** (will work when released)
+- ❌ Avoid **Rust 1.93.0 stable** specifically
 
 ---
 

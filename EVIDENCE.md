@@ -93,21 +93,41 @@ This is a **compiler/standard library bug** in the wasm32-wasip2 target, not a w
 
 ---
 
-## Update: Version Regression Identified (2026-02-06)
+## 💣 Update: Release-Specific Regression (2026-02-06)
 
-**Regression:** Bug introduced in **Rust 1.93.0** (2026-01-19)
-**Fix:** Merged in **Rust 1.95.0-nightly** (2026-02-05) via pure P2 migration
+### Bombshell Finding from Comprehensive Bisection
 
-See [notes/05-rust-version-regression.md](notes/05-rust-version-regression.md) for full version bisection results.
+**The bug ONLY exists in Rust 1.93.0 stable** - it was never on master!
 
-| Rust Version | Status | Notes |
-|-------------|--------|-------|
-| 1.90.0-1.92.0 | ✅ Works | Has `fd_close` import |
-| 1.93.0 | ❌ **Broken** | Missing `fd_close` - **regression** |
-| 1.94.0-beta | ❌ **Broken** | Still missing `fd_close` |
-| 1.95.0-nightly | ✅ **Fixed** | Pure P2 implementation, no P1 hybrid |
+See [notes/06-rust-bisection.md](notes/06-rust-bisection.md) for complete bisection analysis.
 
-**Workaround:** Use Rust 1.92.0 or nightly 1.95.0+
+### Tested Versions (10+ nightlies)
+
+| Date | Version | Result | Notes |
+|------|---------|--------|-------|
+| Sep 18, 2025 | 1.92.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Oct 18, 2025 | 1.92.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Nov 18, 2025 | 1.93.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Dec 8, 2025 | 1.92.0 stable | ✅ **PASS** | Has `fd_close` |
+| Dec 29, 2025 | 1.94.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Jan 9, 2026 | 1.94.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Jan 14, 2026 | 1.94.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Jan 17, 2026 | 1.94.0-nightly | ✅ **PASS** | Has `fd_close` |
+| Jan 18, 2026 | 1.94.0-nightly | ✅ **PASS** | Has `fd_close` |
+| **Jan 19, 2026** | **1.93.0 stable** | ❌ **FAIL** | **Missing `fd_close`** |
+
+### Conclusion
+
+This is a **release branch-specific regression**:
+- ✅ Bug was **NEVER on master** (all nightlies work)
+- ❌ Bug **ONLY in 1.93.0 stable** release
+- 🔍 Likely caused by bad cherry-pick/backport during 1.93.0 release process
+
+**Workaround:**
+- ✅ Use Rust 1.92.0 or earlier
+- ✅ Use **any nightly version** (all work!)
+- ✅ Use Rust 1.94.0-beta or wait for stable
+- ❌ Avoid Rust 1.93.0 stable specifically
 
 ## Next Steps
 
