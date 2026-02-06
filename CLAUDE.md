@@ -174,6 +174,17 @@ Figure out:
 - [Wasmtime Documentation](https://docs.wasmtime.dev/)
 - [wasm32-wasip2 Target](https://doc.rust-lang.org/nightly/rustc/platform-support/wasm32-wasip2.html)
 
+## Investigation Notes
+
+**📁 Check the `notes/` directory for detailed investigation findings.**
+
+Each investigation session is documented in the `notes/` directory with:
+- Detailed findings and data
+- Commands run and results
+- Conclusions and next steps
+
+Start with **[notes/index.md](notes/index.md)** for a summary and index of all notes.
+
 ## Git History
 
 - Initial commit: Minimal reproduction of resource leak issue
